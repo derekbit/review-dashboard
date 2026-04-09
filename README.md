@@ -103,7 +103,7 @@ Create the GitHub token secret:
 
 ```bash
 kubectl create secret generic review-dashboard \
-  --from-literal=github-token=ghp_xxx
+  --from-literal=github-token=xxx
 ```
 
 Apply the Pod manifest:
