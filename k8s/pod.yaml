@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: review-dashboard
+  labels:
+    app: review-dashboard
+spec:
+  containers:
+    - name: review-dashboard
+      image: ghcr.io/your-org/review-dashboard:latest
+      imagePullPolicy: IfNotPresent
+      ports:
+        - containerPort: 8080
+          name: http
+      env:
+        - name: PORT
+          value: "8080"
+        - name: GITHUB_ORG
+          value: "longhorn"
+        - name: GITHUB_CONCURRENCY
+          value: "8"
+        - name: GITHUB_CACHE_TTL
+          value: "2m"
+        - name: GITHUB_REFRESH_TIMEOUT
+          value: "90s"
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: review-dashboard
+              key: github-token
+      readinessProbe:
+        httpGet:
+          path: /healthz
+          port: http
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: http
+        initialDelaySeconds: 15
+        periodSeconds: 20
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi

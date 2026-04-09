@@ -1,0 +1,723 @@
+{{define "index.html"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.OrgDisplay}} Review Dashboard</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fa;
+      --surface: #ffffff;
+      --surface-strong: #ffffff;
+      --surface-muted: #f6f8fa;
+      --border: #d0d7de;
+      --border-soft: #d8dee4;
+      --text: #24292f;
+      --muted: #57606a;
+      --accent: #0969da;
+      --accent-soft: #ddf4ff;
+      --warning: #b45309;
+      --danger: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .shell {
+      width: min(1560px, calc(100% - 24px));
+      margin: 0 auto;
+      padding: 12px 0 24px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+    }
+
+    .eyebrow {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .hero-title {
+      margin: 0;
+      font-size: 1.5rem;
+      line-height: 1.2;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .meta, .error, .warning-note {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .warning-note {
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #8a4b08;
+    }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0;
+    }
+
+    .toolbar-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      flex: 1 1 720px;
+    }
+
+    .toolbar-summary {
+      color: var(--muted);
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      min-width: min(100%, 560px);
+      flex: 1 1 560px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: white;
+      overflow: hidden;
+    }
+
+    .filter-group label {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 500;
+      border-right: 1px solid var(--border-soft);
+      min-height: 34px;
+    }
+
+    .filter-group select {
+      width: 100%;
+      border: 0;
+      background: white;
+      color: var(--text);
+      padding: 7px 10px;
+      font: inherit;
+      min-height: 34px;
+    }
+
+    .ghost-button {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #f6f8fa;
+      color: var(--text);
+      padding: 7px 10px;
+      font: inherit;
+      cursor: pointer;
+      min-height: 34px;
+    }
+
+    .stat {
+      min-width: 120px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .stat strong {
+      display: inline;
+      font-size: inherit;
+      margin-top: 0;
+      margin-left: 6px;
+      color: var(--text);
+    }
+
+    .repo-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .repo-card {
+      padding: 0;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .repo-card h2 {
+      margin: 0;
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .repo-toggle {
+      display: block;
+    }
+
+    .repo-summary {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 88px 52px;
+      align-items: center;
+      column-gap: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      list-style: none;
+      background: var(--surface-muted);
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .repo-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .repo-summary::after {
+      content: "Collapse";
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 500;
+      text-align: right;
+    }
+
+    .repo-toggle:not([open]) .repo-summary::after {
+      content: "Expand";
+    }
+
+    .repo-toggle[hidden] {
+      display: none;
+    }
+
+    .repo-content {
+      padding: 0;
+    }
+
+    .pill {
+      display: inline-block;
+      text-align: right;
+      background: transparent;
+      color: var(--muted);
+      padding: 0;
+      font-size: 0.72rem;
+      font-weight: 500;
+      border: 0;
+      min-width: 0;
+      justify-self: end;
+      white-space: nowrap;
+    }
+
+    .empty {
+      padding: 12px;
+      border-radius: 0;
+      background: #ffffff;
+      color: var(--muted);
+      border-top: 1px solid var(--border-soft);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      background: var(--surface-strong);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1240px;
+      table-layout: fixed;
+    }
+
+    th, td {
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    th {
+      font-size: 0.72rem;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--muted);
+      background: var(--surface-muted);
+      position: sticky;
+      top: 0;
+      font-weight: 600;
+    }
+
+    tbody tr:hover {
+      background: #fbfdff;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    tbody tr[hidden] {
+      display: none;
+    }
+
+    th.col-number, td.col-number { width: 7%; }
+    th.col-title, td.col-title { width: 40%; }
+    th.col-author, td.col-author { width: 13%; }
+    th.col-reviewers, td.col-reviewers { width: 13%; }
+    th.col-reviewed, td.col-reviewed { width: 13%; }
+    th.col-last-review, td.col-last-review { width: 14%; }
+
+    .pr-link {
+      font-weight: 400;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .title-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .pr-number {
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .repo-card h2 a:hover, .pr-link:hover {
+      color: var(--accent);
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .results-note {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .reviewers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .login-link {
+      color: var(--text);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .reviewer {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 0;
+      border-radius: 0;
+      background: transparent;
+      border: 0;
+      font-size: 0.76rem;
+      color: #334155;
+      min-width: 0;
+    }
+
+    .reviewer img {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #dbe4ea;
+    }
+
+    .status {
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
+    .status.warning { color: var(--warning); }
+    .status.danger { color: var(--danger); }
+
+    @media (max-width: 700px) {
+      .shell { width: min(100% - 20px, 1320px); padding-top: 20px; }
+      .hero { padding: 12px; border-radius: 8px; }
+      .toolbar { align-items: stretch; }
+      .toolbar-summary { white-space: normal; }
+      .repo-summary {
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding: 10px 12px;
+        row-gap: 8px;
+      }
+      .repo-summary::after {
+        grid-column: 2;
+      }
+      .pill {
+        justify-self: start;
+        min-width: 0;
+      }
+      th, td { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="eyebrow">Pull Requests</div>
+      <h1 class="hero-title">{{.OrgDisplay}} Review Dashboard</h1>
+      <div class="meta">Across {{.OrgDisplay}}. Generated at {{.GeneratedAt}}.</div>
+      {{if .Warnings}}
+      <div class="warning-note">Some repositories were skipped because the current token cannot read all pull request data.</div>
+      {{end}}
+      {{if .Error}}
+      <div class="error">Dashboard loaded with an error: {{.Error}}</div>
+      {{end}}
+      <div class="toolbar">
+        <div class="toolbar-controls">
+          <div class="filter-group">
+            <label for="user-filter">Search</label>
+            <select id="user-filter">
+              <option value="">All users</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="created-filter">Created</label>
+            <select id="created-filter">
+              <option value="">All time</option>
+              <option value="30">Last 1M</option>
+              <option value="90">Last 3M</option>
+              <option value="180">Last 6M</option>
+              <option value="365">Last 1Y</option>
+            </select>
+          </div>
+          <button class="ghost-button" id="clear-filter" type="button">Clear Filter</button>
+          <button class="ghost-button" id="toggle-collapse-all" type="button">Expand All</button>
+        </div>
+        <div class="toolbar-summary">GitHub-style review queue</div>
+      </div>
+      <div class="results-note" id="results-note">Showing all pull requests. Repositories are collapsed by default.</div>
+      <div class="stats">
+        <div class="stat">Repositories<strong>{{.RepoCount}}</strong></div>
+        <div class="stat">Open PRs<strong>{{.PullRequestCount}}</strong></div>
+        <div class="stat">API<strong><a href="/api/dashboard">/api/dashboard</a></strong></div>
+      </div>
+    </section>
+
+    <section class="repo-grid">
+      {{range .Repositories}}
+      <article class="repo-card">
+        <details class="repo-toggle" data-repo-name="{{.Name}}">
+          <summary class="repo-summary">
+            <h2><a href="{{.URL}}" target="_blank" rel="noreferrer">{{.Name}}</a></h2>
+            <span class="pill">{{len .PullRequests}} open</span>
+          </summary>
+          <div class="repo-content">
+        {{if .PullRequests}}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-number">#</th>
+                <th class="col-title">Title</th>
+                <th class="col-author">Assignee</th>
+                <th class="col-reviewers">Reviewers</th>
+                <th class="col-reviewed">Reviewed By</th>
+                <th class="col-last-review">Last Review At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{range .PullRequests}}
+              <tr data-users="{{.Author}}|{{.AuthorLogin}}{{range .Assignees}}|{{.Login}}|{{.Display}}{{end}}{{range .RequestedReviewers}}|{{.Login}}|{{.Display}}{{end}}{{range .Reviewers}}|{{.Login}}|{{.Display}}{{end}}" data-created-at="{{.CreatedAt}}">
+                <td class="col-number">
+                  <a class="pr-link pr-number" href="{{.URL}}" target="_blank" rel="noreferrer">{{.Number}}</a>
+                </td>
+                <td class="col-title">
+                  <div class="stack">
+                    <a class="pr-link" href="{{.URL}}" target="_blank" rel="noreferrer">{{.Title}}</a>
+                    <div class="title-meta">
+                      <span>#{{.Number}}</span>
+                      <span>opened by <a href="{{.AuthorURL}}" target="_blank" rel="noreferrer">@{{.AuthorLogin}}</a></span>
+                      <span>updated {{.UpdatedAt}}</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="col-author">
+                  {{if .Assignees}}
+                  <div class="reviewers">
+                    {{range .Assignees}}
+                    <span class="reviewer">
+                      {{if .AvatarURL}}<img src="{{.AvatarURL}}" alt="{{.Display}} avatar">{{end}}
+                      <a href="{{.URL}}" target="_blank" rel="noreferrer">@{{.Login}}</a>
+                    </span>
+                    {{end}}
+                  </div>
+                  {{else}}
+                  <span class="muted">Unassigned</span>
+                  {{end}}
+                </td>
+                <td class="col-reviewers">
+                  {{if .RequestedReviewers}}
+                  <div class="reviewers">
+                    {{range .RequestedReviewers}}
+                    <span class="reviewer">
+                      {{if .AvatarURL}}<img src="{{.AvatarURL}}" alt="{{.Display}} avatar">{{end}}
+                      <a href="{{.URL}}" target="_blank" rel="noreferrer">{{.Display}}</a>
+                    </span>
+                    {{end}}
+                  </div>
+                  {{else}}
+                  <span class="muted">No reviewer requested</span>
+                  {{end}}
+                </td>
+                <td class="col-reviewed">
+                  {{if .Reviewers}}
+                  <div class="reviewers">
+                    {{range .Reviewers}}
+                    <span class="reviewer js-reviewed-user" data-identities="{{.Login}}|{{.Display}}" data-reviewed-at="{{.ReviewedAt}}">
+                      {{if .AvatarURL}}<img src="{{.AvatarURL}}" alt="{{.Display}} avatar">{{end}}
+                      <a href="{{.URL}}" target="_blank" rel="noreferrer">{{.Display}}</a>
+                      <span class="status {{if eq .Status "Changes Requested"}}danger{{else if eq .Status "Requested"}}warning{{end}}">{{.Status}}</span>
+                    </span>
+                    {{end}}
+                  </div>
+                  {{else}}
+                  <span class="muted">No review yet</span>
+                  {{end}}
+                </td>
+                <td class="col-last-review">
+                  {{if .LastReviewAt}}
+                  <span class="muted js-last-review" data-default-last-review="{{.LastReviewAt}}">{{.LastReviewAt}}</span>
+                  {{else}}
+                  <span class="muted js-last-review" data-default-last-review="">No review yet</span>
+                  {{end}}
+                </td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+        {{else}}
+        <div class="empty">No open pull requests in this repository.</div>
+        {{end}}
+          </div>
+        </details>
+      </article>
+      {{end}}
+    </section>
+  </main>
+  <script>
+    (() => {
+      const filter = document.getElementById("user-filter");
+      const createdFilter = document.getElementById("created-filter");
+      const clearButton = document.getElementById("clear-filter");
+      const toggleCollapseAllButton = document.getElementById("toggle-collapse-all");
+      const resultsNote = document.getElementById("results-note");
+      const repos = Array.from(document.querySelectorAll(".repo-toggle"));
+      const rows = Array.from(document.querySelectorAll("tbody tr[data-users]"));
+
+      const allUsers = Array.from(new Set(
+        rows.flatMap((row) =>
+          row.dataset.users
+            .split("|")
+            .map((value) => value.trim())
+            .filter(Boolean)
+        )
+      )).sort((a, b) => a.localeCompare(b));
+
+      for (const user of allUsers) {
+        const option = document.createElement("option");
+        option.value = user;
+        option.textContent = user;
+        filter.appendChild(option);
+      }
+
+      const updateLastReviewAt = (row, selectedUser) => {
+        const lastReview = row.querySelector(".js-last-review");
+        if (!lastReview) {
+          return;
+        }
+
+        const defaultReviewAt = lastReview.dataset.defaultLastReview || "";
+        if (!selectedUser) {
+          lastReview.textContent = defaultReviewAt || "No review yet";
+          return;
+        }
+
+        const matchingReviewTimes = Array.from(row.querySelectorAll(".js-reviewed-user[data-reviewed-at]"))
+          .filter((reviewer) => reviewer.dataset.reviewedAt)
+          .filter((reviewer) =>
+            reviewer.dataset.identities
+              .split("|")
+              .map((value) => value.trim())
+              .includes(selectedUser)
+          )
+          .map((reviewer) => reviewer.dataset.reviewedAt)
+          .sort((left, right) => right.localeCompare(left));
+
+        lastReview.textContent = matchingReviewTimes[0] || "No review yet";
+      };
+
+      const matchesCreatedFilter = (row, createdWindowDays) => {
+        if (!createdWindowDays) {
+          return true;
+        }
+
+        const createdAt = row.dataset.createdAt;
+        if (!createdAt) {
+          return false;
+        }
+
+        const createdAtTime = Date.parse(createdAt);
+        if (Number.isNaN(createdAtTime)) {
+          return false;
+        }
+
+        const threshold = Date.now() - (createdWindowDays * 24 * 60 * 60 * 1000);
+        return createdAtTime >= threshold;
+      };
+
+      const describeCreatedFilter = (createdWindowDays) => {
+        switch (createdWindowDays) {
+          case 30:
+            return "created in the last 1M";
+          case 90:
+            return "created in the last 3M";
+          case 180:
+            return "created in the last 6M";
+          case 365:
+            return "created in the last 1Y";
+          default:
+            return "";
+        }
+      };
+
+      const updateToggleCollapseAllButton = () => {
+        const visibleRepos = repos.filter((repo) => !repo.hidden);
+        const hasExpandedRepo = visibleRepos.some((repo) => repo.open);
+        toggleCollapseAllButton.textContent = hasExpandedRepo ? "Collapse All" : "Expand All";
+      };
+
+      const updateView = () => {
+        const selectedUser = filter.value;
+        const createdWindowDays = Number.parseInt(createdFilter.value, 10) || 0;
+        let visibleRows = 0;
+        let visibleRepos = 0;
+
+        for (const repo of repos) {
+          const repoRows = Array.from(repo.querySelectorAll("tbody tr[data-users]"));
+          let matchedRows = 0;
+
+          for (const row of repoRows) {
+            const users = row.dataset.users
+              .split("|")
+              .map((value) => value.trim());
+            const matchesUser = !selectedUser || users.includes(selectedUser);
+            const matchesCreatedAt = matchesCreatedFilter(row, createdWindowDays);
+            const matches = matchesUser && matchesCreatedAt;
+            row.hidden = !matches;
+            updateLastReviewAt(row, selectedUser);
+            if (matches) {
+              matchedRows += 1;
+              visibleRows += 1;
+            }
+          }
+
+          const hasVisibleRows = matchedRows > 0;
+          repo.hidden = !hasVisibleRows;
+          repo.open = selectedUser ? hasVisibleRows : false;
+          if (hasVisibleRows) {
+            visibleRepos += 1;
+          }
+        }
+
+        if (!selectedUser && !createdWindowDays) {
+          resultsNote.textContent = "Showing all pull requests. Repositories are collapsed by default.";
+          updateToggleCollapseAllButton();
+          return;
+        }
+
+        const filters = [];
+        if (selectedUser) {
+          filters.push(`for ${selectedUser}`);
+        }
+        if (createdWindowDays) {
+          filters.push(describeCreatedFilter(createdWindowDays));
+        }
+
+        resultsNote.textContent = `Showing ${visibleRows} pull request(s) in ${visibleRepos} repo(s) ${filters.join(" ")}.`;
+        updateToggleCollapseAllButton();
+      };
+
+      filter.addEventListener("change", updateView);
+      createdFilter.addEventListener("change", updateView);
+      clearButton.addEventListener("click", () => {
+        filter.value = "";
+        createdFilter.value = "";
+        updateView();
+      });
+      toggleCollapseAllButton.addEventListener("click", () => {
+        const visibleRepos = repos.filter((repo) => !repo.hidden);
+        const shouldCollapse = visibleRepos.some((repo) => repo.open);
+        for (const repo of visibleRepos) {
+          repo.open = !shouldCollapse;
+        }
+        updateToggleCollapseAllButton();
+      });
+
+      for (const repo of repos) {
+        repo.addEventListener("toggle", updateToggleCollapseAllButton);
+      }
+
+      updateView();
+    })();
+  </script>
+</body>
+</html>
+{{end}}
