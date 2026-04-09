@@ -8,7 +8,7 @@ spec:
   containers:
     - name: review-dashboard
       image: ghcr.io/derekbit/review-dashboard:latest
-      imagePullPolicy: IfNotPresent
+      imagePullPolicy: Always
       ports:
         - containerPort: 8080
           name: http
