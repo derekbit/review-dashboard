@@ -7,7 +7,7 @@ metadata:
 spec:
   containers:
     - name: review-dashboard
-      image: ghcr.io/your-org/review-dashboard:latest
+      image: ghcr.io/derekbit/review-dashboard:latest
       imagePullPolicy: IfNotPresent
       ports:
         - containerPort: 8080

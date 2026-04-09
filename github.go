@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -45,11 +46,19 @@ type pullRequestView struct {
 	AuthorLogin        string         `json:"authorLogin"`
 	AuthorURL          string         `json:"authorUrl"`
 	Assignees          []reviewerView `json:"assignees"`
+	Labels             []labelView    `json:"labels"`
 	CreatedAt          string         `json:"createdAt"`
 	UpdatedAt          string         `json:"updatedAt"`
 	LastReviewAt       string         `json:"lastReviewAt"`
 	Reviewers          []reviewerView `json:"reviewers"`
 	RequestedReviewers []reviewerView `json:"requestedReviewers"`
+}
+
+type labelView struct {
+	Name        string `json:"name"`
+	Color       string `json:"color"`
+	TextColor   string `json:"textColor"`
+	BorderColor string `json:"borderColor"`
 }
 
 type reviewerView struct {
@@ -72,15 +81,21 @@ type githubRepository struct {
 }
 
 type githubPullRequest struct {
-	Number             int          `json:"number"`
-	Title              string       `json:"title"`
-	HTMLURL            string       `json:"html_url"`
-	CreatedAt          time.Time    `json:"created_at"`
-	UpdatedAt          time.Time    `json:"updated_at"`
-	User               githubUser   `json:"user"`
-	Assignees          []githubUser `json:"assignees"`
-	RequestedReviewers []githubUser `json:"requested_reviewers"`
-	RequestedTeams     []githubTeam `json:"requested_teams"`
+	Number             int           `json:"number"`
+	Title              string        `json:"title"`
+	HTMLURL            string        `json:"html_url"`
+	CreatedAt          time.Time     `json:"created_at"`
+	UpdatedAt          time.Time     `json:"updated_at"`
+	User               githubUser    `json:"user"`
+	Assignees          []githubUser  `json:"assignees"`
+	Labels             []githubLabel `json:"labels"`
+	RequestedReviewers []githubUser  `json:"requested_reviewers"`
+	RequestedTeams     []githubTeam  `json:"requested_teams"`
+}
+
+type githubLabel struct {
+	Name  string `json:"name"`
+	Color string `json:"color"`
 }
 
 type githubUser struct {
@@ -102,7 +117,13 @@ type githubReview struct {
 	User        githubUser `json:"user"`
 }
 
-const hiddenReviewerLogin = "copilot-pull-request-reviewer[bot]"
+var hiddenReviewerIdentities = map[string]struct{}{
+	"copilot-pull-request-reviewer[bot]": {},
+	"dev":                                {},
+	"dev-control-plane":                  {},
+	"dev-data-plane":                     {},
+	"doc":                                {},
+}
 
 func newGitHubClient(token string, concurrency int) *githubClient {
 	if concurrency < 1 {
@@ -227,6 +248,7 @@ func (c *githubClient) buildPullRequestViews(ctx context.Context, org, repo stri
 				AuthorLogin:        pr.User.Login,
 				AuthorURL:          pr.User.HTMLURL,
 				Assignees:          usersToReviewerViews(pr.Assignees),
+				Labels:             labelsToLabelViews(pr.Labels),
 				CreatedAt:          pr.CreatedAt.Format(time.RFC3339),
 				UpdatedAt:          pr.UpdatedAt.Format(time.RFC3339),
 				LastReviewAt:       latestReviewAt(reviewers),
@@ -268,6 +290,9 @@ func (c *githubClient) loadReviewers(ctx context.Context, org, repo string, pr g
 	}
 
 	for _, team := range pr.RequestedTeams {
+		if shouldHideTeam(team) {
+			continue
+		}
 		view := reviewerView{
 			Login:     "@" + team.Slug,
 			Display:   team.Name,
@@ -418,8 +443,88 @@ func usersToReviewerViews(users []githubUser) []reviewerView {
 	return views
 }
 
+func labelsToLabelViews(labels []githubLabel) []labelView {
+	views := make([]labelView, 0, len(labels))
+	for _, label := range labels {
+		if strings.TrimSpace(label.Name) == "" {
+			continue
+		}
+		backgroundColor, borderColor, textColor := githubLabelColors(label.Color)
+		views = append(views, labelView{
+			Name:        label.Name,
+			Color:       backgroundColor,
+			TextColor:   textColor,
+			BorderColor: borderColor,
+		})
+	}
+
+	sort.Slice(views, func(i, j int) bool {
+		return strings.ToLower(views[i].Name) < strings.ToLower(views[j].Name)
+	})
+	return views
+}
+
+func githubLabelColors(rawColor string) (string, string, string) {
+	hex := normalizeGitHubHexColor(rawColor)
+	red, green, blue := parseHexColor(hex)
+	textColor := "#1f2328"
+	if perceivedBrightness(red, green, blue) < 140 {
+		textColor = "#ffffff"
+	}
+	return hex, darkenHexColor(red, green, blue, 0.18), textColor
+}
+
+func normalizeGitHubHexColor(rawColor string) string {
+	value := strings.TrimPrefix(strings.TrimSpace(rawColor), "#")
+	if len(value) != 6 {
+		return "#ddf4ff"
+	}
+	for _, r := range value {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", r) {
+			return "#ddf4ff"
+		}
+	}
+	return "#" + strings.ToLower(value)
+}
+
+func parseHexColor(hex string) (int, int, int) {
+	value := strings.TrimPrefix(hex, "#")
+	if len(value) != 6 {
+		return 221, 244, 255
+	}
+	red, _ := strconv.ParseInt(value[0:2], 16, 64)
+	green, _ := strconv.ParseInt(value[2:4], 16, 64)
+	blue, _ := strconv.ParseInt(value[4:6], 16, 64)
+	return int(red), int(green), int(blue)
+}
+
+func perceivedBrightness(red, green, blue int) int {
+	return (red*299 + green*587 + blue*114) / 1000
+}
+
+func darkenHexColor(red, green, blue int, ratio float64) string {
+	adjust := func(value int) int {
+		result := int(float64(value) * (1 - ratio))
+		if result < 0 {
+			return 0
+		}
+		return result
+	}
+	return fmt.Sprintf("#%02x%02x%02x", adjust(red), adjust(green), adjust(blue))
+}
+
 func shouldHideReviewer(login string) bool {
-	return strings.EqualFold(strings.TrimSpace(login), hiddenReviewerLogin)
+	_, hidden := hiddenReviewerIdentities[normalizeHiddenIdentity(login)]
+	return hidden
+}
+
+func shouldHideTeam(team githubTeam) bool {
+	return shouldHideReviewer(team.Slug) || shouldHideReviewer(team.Name)
+}
+
+func normalizeHiddenIdentity(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	return strings.TrimPrefix(value, "@")
 }
 
 func latestReviewAt(reviewers []reviewerView) string {

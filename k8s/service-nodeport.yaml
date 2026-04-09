@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: review-dashboard-nodeport
+  labels:
+    app: review-dashboard
+spec:
+  selector:
+    app: review-dashboard
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: 30080
+  type: NodePort

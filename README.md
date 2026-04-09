@@ -99,17 +99,93 @@ For this workflow to push successfully, make sure:
 
 A sample Pod manifest is available at [k8s/pod.yaml](k8s/pod.yaml).
 
+The Pod reads `GITHUB_TOKEN` from a Kubernetes Secret with:
+
+- secret name: `review-dashboard`
+- key: `github-token`
+
 Create the GitHub token secret:
 
 ```bash
 kubectl create secret generic review-dashboard \
-  --from-literal=github-token=xxx
+  --from-literal=github-token=YOUR_GITHUB_TOKEN
+```
+
+If you deploy into a namespace, create the secret in that same namespace:
+
+```bash
+kubectl create secret generic review-dashboard \
+  -n your-namespace \
+  --from-literal=github-token=YOUR_GITHUB_TOKEN
+```
+
+If the secret already exists, update it with:
+
+```bash
+kubectl create secret generic review-dashboard \
+  --from-literal=github-token=YOUR_GITHUB_TOKEN \
+  --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 Apply the Pod manifest:
 
 ```bash
 kubectl apply -f k8s/pod.yaml
+```
+
+Expose the Pod with a Service:
+
+```bash
+kubectl apply -f k8s/service.yaml
+```
+
+If you want users to access the service directly through a node IP, use a NodePort Service instead:
+
+```bash
+kubectl apply -f k8s/service-nodeport.yaml
+```
+
+Then access it with:
+
+```text
+http://<node-ip>:30080
+```
+
+You can inspect the node IPs with:
+
+```bash
+kubectl get nodes -o wide
+```
+
+The provided [k8s/service-nodeport.yaml](k8s/service-nodeport.yaml) exposes the app on node port `30080`.
+
+Expose the Service with an Ingress:
+
+```bash
+kubectl apply -f k8s/ingress.yaml
+```
+
+For local access through the Service:
+
+```bash
+kubectl port-forward svc/review-dashboard 8080:80
+```
+
+Then open [http://localhost:8080](http://localhost:8080).
+
+The provided [k8s/service.yaml](k8s/service.yaml) creates a `ClusterIP` Service that selects Pods with label `app=review-dashboard`.
+
+Use [k8s/service-nodeport.yaml](k8s/service-nodeport.yaml) when you want simple access through `node-ip:30080` without setting up an Ingress controller or external load balancer.
+
+The provided [k8s/ingress.yaml](k8s/ingress.yaml) routes HTTP traffic to that Service. Before applying it, update:
+
+- `host` to your real DNS name
+- `ingressClassName` if your cluster requires a specific ingress class such as `nginx` or `traefik`
+
+After applying the Ingress, point your DNS record at the ingress controller address. You can inspect it with:
+
+```bash
+kubectl get ingress review-dashboard
 ```
 
 Before applying it, update these fields in [k8s/pod.yaml](k8s/pod.yaml):
